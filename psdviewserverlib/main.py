@@ -9,17 +9,16 @@ from __future__ import division
 from bottle     import route, run, template, response
 from psd_tools  import PSDImage
 from cStringIO  import StringIO
-from glob       import glob
-from os         import path
+from os         import path, listdir
+from sys        import argv
 from PIL        import Image
 
+if __name__ == '__main__':
+    rootDir = argv[1]
 
-def listPSD():
-    psds  = glob('./psdfiles/*.psd')
-    return [path.split(psd)[1] for psd in psds]
 
-def psd2image(filename):
-    psd   = PSDImage.load('./psdfiles/' + filename)
+def psd2image(psdPath):
+    psd   = PSDImage.load(psdPath)
     merge = psd.as_PIL()
     return merge
     
@@ -34,32 +33,49 @@ def image2stream(image, format, maxHeight=None):
     stream.seek(0)
     return stream
     
-@route('/index')
-def index():
-    psds = listPSD()
+    
+@route('/ls')    
+@route('/<psdPath:path>/ls')
+def ls(psdPath=''):
     return template('''
 <body bgcolor="grey">
-%for psd in psds:
-    <a href="./psdfiles/{{psd}}/fullsize">
-        <img src="./psdfiles/{{psd}}/thumbnail"/>
-    </a>
-</body>
+%absPath = path.join(rootDir, psdPath)    
+%for item in listdir(absPath):
+     %url = '/'.join((psdPath, item))
+     %url = '/' + url if psdPath else url
+     %if path.splitext(item)[1].lower() == '.psd':
+         <a href="{{url}}/fullsize">
+             <img src="{{url}}/thumbnail"/>
+         </a>
+     %elif path.isdir(absPath):
+         <a href="{{url}}/ls">{{item}}</a>
+         <br/>
+     %end
 %end
-    ''', psds=psds, splitext=path.splitext)
+</body>
+    ''', rootDir=rootDir, psdPath = psdPath, listdir=listdir, path=path)
+
+    
+@route('/index')
+def index():
+    return ls('')
+
     
     
-@route('/psdfiles/<filename>/thumbnail')
-def thumbnailRender(filename):
+@route('/<psdPath:path>/thumbnail')
+def thumbnailRender(psdPath):
+    psdPath   = path.join(rootDir, psdPath)
     maxHeight = 300
-    image     = psd2image(filename)
+    image     = psd2image(psdPath)
     stream    = image2stream(image, format='jpeg', maxHeight=maxHeight)
     return stream.read()
     
-@route('/psdfiles/<filename>/fullsize')
-def imageRender(filename):
-    image     = psd2image(filename)
+@route('/<psdPath:path>/fullsize')
+def imageRender(psdPath):
+    psdPath   = path.join(rootDir, psdPath)
+    image     = psd2image(psdPath)
     stream    = image2stream(image, format='jpeg')
     response.set_header('Content-type', 'image/jpeg')
     return stream.read()
 
-run(host='', port=8080)
+run(host='', port=8045)
