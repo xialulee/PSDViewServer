@@ -10,23 +10,32 @@ from bottle     import route, run, template, response
 from psd_tools  import PSDImage
 from cStringIO  import StringIO
 from os         import path, listdir
-from sys        import argv
+from sys        import argv, getfilesystemencoding
 from PIL        import Image
 
+
 if __name__ == '__main__':
-    rootDir = argv[1]
+    root_path = argv[1]
 
 
-def psd2image(psdPath):
-    psd   = PSDImage.load(psdPath)
+def encode_path(path):
+    return path.decode(getfilesystemencoding()).encode('UTF-8')
+    
+    
+def decode_path(path):
+    return path.decode('UTF-8').encode(getfilesystemencoding())
+
+
+def psd_to_image(psd_path):
+    psd   = PSDImage.load(psd_path)
     merge = psd.as_PIL()
     return merge
     
-def image2stream(image, format, maxHeight=None):
-    if maxHeight:
+def image_to_stream(image, format, max_height=None):
+    if max_height:
         size  = image.size
-        ratio = maxHeight / size[1]
-        image = image.resize((int(size[0]*ratio), maxHeight), Image.ANTIALIAS)
+        ratio = max_height / size[1]
+        image = image.resize((int(size[0]*ratio), max_height), Image.ANTIALIAS)
     
     stream = StringIO()
     image.save(stream, format=format)
@@ -35,14 +44,15 @@ def image2stream(image, format, maxHeight=None):
     
     
 @route('/ls')    
-@route('/<psdPath:path>/ls')
-def ls(psdPath=''):
+@route('/<psd_path:path>/ls')
+def ls(psd_path=''):
     return template('''
 <body bgcolor="grey">
-%absPath = path.join(rootDir, psdPath)    
+%absPath = path.join(root_path, psd_path) 
 %for item in listdir(absPath):
-     %url = '/'.join((psdPath, item))
-     %url = '/' + url if psdPath else url
+     %item = encode_path(item)
+     %url = '/'.join((psd_path, item))
+     %url = '/' + url if psd_path else url
      %if path.splitext(item)[1].lower() == '.psd':
          <a href="{{url}}/fullsize">
              <img src="{{url}}/thumbnail"/>
@@ -53,28 +63,33 @@ def ls(psdPath=''):
      %end
 %end
 </body>
-    ''', rootDir=rootDir, psdPath = psdPath, listdir=listdir, path=path)
+    ''', root_path=root_path, 
+         psd_path=psd_path, 
+         listdir=listdir, 
+         path=path,
+         encode_path=encode_path)
 
     
 @route('/index')
 def index():
     return ls('')
-
+   
     
-    
-@route('/<psdPath:path>/thumbnail')
-def thumbnailRender(psdPath):
-    psdPath   = path.join(rootDir, psdPath)
-    maxHeight = 300
-    image     = psd2image(psdPath)
-    stream    = image2stream(image, format='jpeg', maxHeight=maxHeight)
+@route('/<psd_path:path>/thumbnail')
+def thumbnailRender(psd_path):
+    psd_path   = decode_path(psd_path)
+    psd_path   = path.join(root_path, psd_path)
+    max_height = 300
+    image     = psd_to_image(psd_path)
+    stream    = image_to_stream(image, format='jpeg', max_height=max_height)
     return stream.read()
     
-@route('/<psdPath:path>/fullsize')
-def imageRender(psdPath):
-    psdPath   = path.join(rootDir, psdPath)
-    image     = psd2image(psdPath)
-    stream    = image2stream(image, format='jpeg')
+@route('/<psd_path:path>/fullsize')
+def imageRender(psd_path):
+    psd_path   = decode_path(psd_path)
+    psd_path   = path.join(root_path, psd_path)
+    image     = psd_to_image(psd_path)
+    stream    = image_to_stream(image, format='jpeg')
     response.set_header('Content-type', 'image/jpeg')
     return stream.read()
 
