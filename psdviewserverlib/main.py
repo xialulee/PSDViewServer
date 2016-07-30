@@ -6,16 +6,32 @@ Created on Saturday September 12 2015
 """
 
 from __future__ import division
-from bottle     import route, run, template, response
-from psd_tools  import PSDImage
-from cStringIO  import StringIO
+import os
 from os         import path, listdir
 from sys        import argv, getfilesystemencoding
+from cStringIO  import StringIO
+from xml.dom    import minidom
+from bottle     import route, run, template, response
+from psd_tools  import PSDImage
 from PIL        import Image
 
 
 if __name__ == '__main__':
     root_path = argv[1]
+
+
+def list_dir(path):
+    bridge_sort_path = os.path.join(path, '.BridgeSort')
+    if os.path.exists(bridge_sort_path):
+        doc = minidom.parse(bridge_sort_path)
+        r = doc.documentElement
+        files = r.getElementsByTagName('files')[0]
+        items = files.getElementsByTagName('item')
+        return [item.getAttribute('key')[:-14].encode(getfilesystemencoding())\
+            for item in items]
+    else:
+        return listdir(path)
+        
 
 
 def encode_path(path):
@@ -48,8 +64,8 @@ def image_to_stream(image, format, max_height=None):
 def ls(psd_path=''):
     return template('''
 <body bgcolor="grey">
-%absPath = path.join(root_path, psd_path) 
-%for item in listdir(absPath):
+%abs_path = path.join(root_path, psd_path) 
+%for item in listdir(abs_path):
      %item = encode_path(item)
      %url = '/'.join((psd_path, item))
      %url = '/' + url if psd_path else url
@@ -57,7 +73,7 @@ def ls(psd_path=''):
          <a href="{{url}}/fullsize">
              <img src="{{url}}/thumbnail"/>
          </a>
-     %elif path.isdir(absPath):
+     %elif path.isdir(abs_path):
          <a href="{{url}}/ls">{{item}}</a>
          <br/>
      %end
@@ -65,7 +81,7 @@ def ls(psd_path=''):
 </body>
     ''', root_path=root_path, 
          psd_path=psd_path, 
-         listdir=listdir, 
+         listdir=list_dir, 
          path=path,
          encode_path=encode_path)
 
@@ -76,16 +92,16 @@ def index():
    
     
 @route('/<psd_path:path>/thumbnail')
-def thumbnailRender(psd_path):
+def thumbnail_render(psd_path):
     psd_path   = decode_path(psd_path)
     psd_path   = path.join(root_path, psd_path)
     max_height = 300
     image     = psd_to_image(psd_path)
-    stream    = image_to_stream(image, format='jpeg', max_height=max_height)
+    stream    = image_to_stream(image, format='png', max_height=max_height)
     return stream.read()
     
 @route('/<psd_path:path>/fullsize')
-def imageRender(psd_path):
+def image_render(psd_path):
     psd_path   = decode_path(psd_path)
     psd_path   = path.join(root_path, psd_path)
     image     = psd_to_image(psd_path)
