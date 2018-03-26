@@ -27,11 +27,9 @@ def list_dir(path):
         r = doc.documentElement
         files = r.getElementsByTagName('files')[0]
         items = files.getElementsByTagName('item')
-        #return [item.getAttribute('key')[:-14] for item in items]
-        for item in items:
-            yield Path(item.getAttribute('key')[:-14])
+        return [item.getAttribute('key')[:-14] for item in items]
     else:
-        return path.iterdir()
+        return [item.name for item in path.iterdir()]
         
         
 
@@ -64,11 +62,11 @@ def ls(psd_path=''):
 %for item in list_dir(abs_path):
     %url = '/'.join((psd_path, str(item)))
     %url = '/'+url if psd_path else url
-    %if item.suffix == '.psd':
+    %if item.split(".")[-1] == 'psd':
         <a href="{{url}}/fullsize">
             <img src="{{url}}/thumbnail"/>
         </a>
-    %elif abs_path.is_dir():
+    %elif (abs_path/item).is_dir():
         <a href="{{url}}/ls">{{str(item)}}</a>
         <br/>
     %end
